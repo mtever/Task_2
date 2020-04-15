@@ -5,55 +5,30 @@
 #include <cilk/reducer_vector.h>
 #include <chrono>
 #include <iostream>
+#include <stdlib.h>
+#include <vector>
 
 using namespace std::chrono;
 
-/// Функция ReducerMaxTest() определяет максимальный элемент массива,
-/// переданного ей в качестве аргумента, и его позицию
-/// mass_pointer - указатель исходный массив целых чисел
-/// size - количество элементов в массиве
-void ReducerMaxTest(int *mass_pointer, const long size)
+void CompareForAndCilk_For(size_t sz)
 {
-	cilk::reducer<cilk::op_max_index<long, int>> maximum;
-	cilk_for(long i = 0; i < size; ++i)
-	{
-		maximum->calc_max(i, mass_pointer[i]);
-	}
-	printf("Maximal element = %d has index = %d\n",
-		maximum->get_reference(), maximum->get_index_reference());
-}
-
-void ReducerMinTest(int *mass_pointer, const long size)
-{
-	cilk::reducer<cilk::op_min_index<long, int>> minimum;
-	cilk_for(long i = 0; i < size; ++i)
-	{
-		minimum->calc_min(i, mass_pointer[i]);
-	}
-	printf("Minimal element = %d has index = %d\n",
-		minimum->get_reference(), minimum->get_index_reference());
-}
-
-/// Функция ParallelSort() сортирует массив в порядке возрастания
-/// begin - указатель на первый элемент исходного массива
-/// end - указатель на последний элемент исходного массива
-duration <double> ParallelSort(int *begin, int *end)
-{
+	std::vector<int> my_vect;
+	cilk::reducer<cilk::op_vector<int>>red_vec;
 	high_resolution_clock::time_point t1 = high_resolution_clock::now();
-	if (begin != end)
-	{
-		--end;
-		int *middle = std::partition(begin, end, std::bind2nd(std::less<int>(), *end));
-		std::swap(*end, *middle);
-		cilk_spawn ParallelSort(begin, middle);
-		ParallelSort(++middle, ++end);
-		cilk_sync;
-	}
+	for (int i = 0; i < sz; i++)
+		my_vect.push_back(rand() % 20000 + 1);
 	high_resolution_clock::time_point t2 = high_resolution_clock::now();
-	duration<double> duration = (t2 - t1);
-	return duration;
-}
+	cilk_for(int i = 0; i < sz; i++)
+		red_vec->push_back(rand() % 20000 + 1);
+	high_resolution_clock::time_point t3 = high_resolution_clock::now();
+	duration<double> duration_for = (t2 - t1);
+	duration<double> duration_cilk = (t3 - t2);
 
+	std::cout << std::endl;
+	std::cout << "-------------Size of massive: " << sz << std::endl;
+	std::cout << "Time for 'for': " << duration_for.count() << " seconds" << std::endl;
+	std::cout << "Time for 'cilk_for': " << duration_cilk.count() << " seconds" << std::endl;
+}
 
 int main()
 {
@@ -70,33 +45,7 @@ int main()
 
 	for (int jj = 0; jj < number_size; jj++)
 	{
-		std::cout << "-------------Size of massive: " << sizes[jj] << std::endl;
-		int *mass_begin, *mass_end;
-		int *mass = new int[sizes[jj]];
-
-		duration <double> duration;
-
-		for (i = 0; i < sizes[jj]; ++i)
-		{
-			mass[i] = (rand() % 25000) + 1;
-		}
-
-		mass_begin = mass;
-		mass_end = mass_begin + sizes[jj];
-
-		//printf("Before sort:\n");
-		ReducerMaxTest(mass, sizes[jj]);
-		ReducerMinTest(mass, sizes[jj]);
-
-		//printf("After sort:\n");
-
-		duration = ParallelSort(mass_begin, mass_end);
-		std::cout << "-----Time sort: " << duration.count() << " seconds" << std::endl;
-		ReducerMaxTest(mass, sizes[jj]);
-		ReducerMinTest(mass, sizes[jj]);
-
-		delete[]mass;
+		CompareForAndCilk_For(sizes[jj]);
 	}
-
 	return 0;
 }
