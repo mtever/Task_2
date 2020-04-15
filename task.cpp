@@ -4,6 +4,7 @@
 #include <cilk/reducer_min.h>
 #include <cilk/reducer_vector.h>
 #include <chrono>
+#include <iostream>
 
 using namespace std::chrono;
 
@@ -18,7 +19,7 @@ void ReducerMaxTest(int *mass_pointer, const long size)
 	{
 		maximum->calc_max(i, mass_pointer[i]);
 	}
-	printf("Maximal element = %d has index = %d\n\n",
+	printf("Maximal element = %d has index = %d\n",
 		maximum->get_reference(), maximum->get_index_reference());
 }
 
@@ -29,15 +30,16 @@ void ReducerMinTest(int *mass_pointer, const long size)
 	{
 		minimum->calc_min(i, mass_pointer[i]);
 	}
-	printf("Minimal element = %d has index = %d\n\n",
+	printf("Minimal element = %d has index = %d\n",
 		minimum->get_reference(), minimum->get_index_reference());
 }
 
 /// Функция ParallelSort() сортирует массив в порядке возрастания
 /// begin - указатель на первый элемент исходного массива
 /// end - указатель на последний элемент исходного массива
-void ParallelSort(int *begin, int *end)
+duration <double> ParallelSort(int *begin, int *end)
 {
+	high_resolution_clock::time_point t1 = high_resolution_clock::now();
 	if (begin != end)
 	{
 		--end;
@@ -47,6 +49,9 @@ void ParallelSort(int *begin, int *end)
 		ParallelSort(++middle, ++end);
 		cilk_sync;
 	}
+	high_resolution_clock::time_point t2 = high_resolution_clock::now();
+	duration<double> duration = (t2 - t1);
+	return duration;
 }
 
 
@@ -59,26 +64,39 @@ int main()
 
 	long i;
 	const long mass_size = 10000;
-	int *mass_begin, *mass_end;
-	int *mass = new int[mass_size];
 
-	for (i = 0; i < mass_size; ++i)
+	long sizes[] = { 10, 50, 100, 500, 1000, 10000, 100000, 500000, 1000000 };
+	int number_size = sizeof(sizes) / sizeof(long);
+
+	for (int jj = 0; jj < number_size; jj++)
 	{
-		mass[i] = (rand() % 25000) + 1;
+		std::cout << "-------------Size of massive: " << sizes[jj] << std::endl;
+		int *mass_begin, *mass_end;
+		int *mass = new int[sizes[jj]];
+
+		duration <double> duration;
+
+		for (i = 0; i < sizes[jj]; ++i)
+		{
+			mass[i] = (rand() % 25000) + 1;
+		}
+
+		mass_begin = mass;
+		mass_end = mass_begin + sizes[jj];
+
+		//printf("Before sort:\n");
+		ReducerMaxTest(mass, sizes[jj]);
+		ReducerMinTest(mass, sizes[jj]);
+
+		//printf("After sort:\n");
+
+		duration = ParallelSort(mass_begin, mass_end);
+		std::cout << "-----Time sort: " << duration.count() << " seconds" << std::endl;
+		ReducerMaxTest(mass, sizes[jj]);
+		ReducerMinTest(mass, sizes[jj]);
+
+		delete[]mass;
 	}
 
-	mass_begin = mass;
-	mass_end = mass_begin + mass_size;
-
-	printf("Before sort:\n\n");
-	ReducerMaxTest(mass, mass_size);
-	ReducerMinTest(mass, mass_size);
-
-	printf("After sort:\n\n");
-	ParallelSort(mass_begin, mass_end);
-	ReducerMaxTest(mass, mass_size);
-	ReducerMinTest(mass, mass_size);
-
-	delete[]mass;
 	return 0;
 }
